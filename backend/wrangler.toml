@@ -1,0 +1,33 @@
+name = "cad3-api"
+main = "src/worker.ts"
+compatibility_date = "2026-01-01"
+# nodejs_compat: lets ENV read process.env (vars + secrets) and gives Node built-ins.
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain — Cloudflare auto-provisions the DNS record + TLS cert on deploy
+# (the cad3massage.com zone is in this account).
+routes = [{ pattern = "api.cad3massage.com", custom_domain = true }]
+
+# Reminder sweep — runs every 15 min (idempotent, so cadence is safe). Cron is UTC,
+# but the engine works in absolute time (now + 2h), so timezone doesn't matter.
+[triggers]
+crons = ["*/15 * * * *"]
+
+[observability]
+enabled = true
+
+# Non-secret config. Secrets (DATABASE_URL, JWT_SECRET, RESEND_API_KEY,
+# PUSHPLUS_TOKEN, STAFF_NOTIFY_EMAIL) are set with `wrangler secret put <KEY>` —
+# never in this file. Keeping the real studio inbox as a secret keeps it out of
+# the (public) repo AND means a deploy can never overwrite the prod value.
+[vars]
+STUDIO_TZ = "America/Chicago"
+EMAIL_FROM = "CAD3 Massage <noreply@cad3massage.com>"
+APP_BASE_URL = "https://www.cad3massage.com"
+ALLOWED_ORIGINS = "https://cad3massage.com,https://www.cad3massage.com,https://staff.cad3massage.com"
+EMAIL_ENABLED = "true"
+WECHAT_ENABLED = "true"
+# STAFF_NOTIFY_EMAIL → set as a Workers secret (see header note), not a committed var.
+
+# api.cad3massage.com is bound as a Custom Domain in the Workers dashboard
+# (or: `routes = [{ pattern = "api.cad3massage.com", custom_domain = true }]`).

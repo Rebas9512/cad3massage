@@ -1,0 +1,3 @@
+# SPA fallback for Cloudflare Pages — every non-asset path serves index.html so
+# React Router handles /book, /menu, /manage, /staff (incl. deep links + refresh).
+/*  /index.html  200

@@ -1,0 +1,17 @@
+Item,Category,Time(min),Price,Active,Description
+A1,Chair,15,20,true,Chair massage
+A2,Chair,20,35,true,Chair massage
+A3,Chair,30,50,true,Chair massage
+F3,Combo,60,60,true,45 min foot + 15 min body
+F4,Combo,60,60,true,30 min foot + 30 min body
+F5,Combo,90,90,true,60 min foot + 30 min body
+C1,Combo,70,75,true,35 min foot + 35 min body
+C2,Combo,90,90,true,45 min foot + 45 min body
+C3,Combo,90,90,true,30 min foot + 1 hour body
+B1,Body,30,55,true,Body
+B2,Body,60,75,true,Body
+B3,Body,90,105,true,Body
+B4,Body,60,125,false,Body 4 hands (needs two therapists; off until staffing allows)
+B5,Body,120,135,true,Body
+F1,Foot,30,35,true,30 min foot
+H1,Head,60,60,false,60 min head (planned, not on current menu)

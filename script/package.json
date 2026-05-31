@@ -1,0 +1,16 @@
+{
+  "name": "cad3massage-acceptance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CAD3 Massage — acceptance & regression test harness (black-box API). Mirrors vault '06 - Testing/Acceptance & Regression Test Plan'.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:smoke": "vitest run -t @smoke"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

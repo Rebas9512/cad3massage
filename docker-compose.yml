@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16
+    container_name: cad3_db
+    environment:
+      POSTGRES_USER: cad3
+      POSTGRES_PASSWORD: cad3
+      POSTGRES_DB: cad3
+    ports:
+      - "5432:5432"
+    volumes:
+      - cad3_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cad3 -d cad3"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  cad3_pgdata:

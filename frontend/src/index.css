@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-bg text-text font-body antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-heading text-ink;
+  }
+  /* Comfortable touch targets on tablets/phones. */
+  button, a[role='button'], [data-tap] {
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-content px-5 sm:px-8;
+  }
+  /* Full-bleed: spans the whole screen with responsive side padding (used on the home page). */
+  .container-wide {
+    @apply mx-auto w-full px-5 sm:px-8 lg:px-12 2xl:px-20;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill font-body font-semibold transition-colors;
+    min-height: 44px;
+  }
+  .btn-primary {
+    @apply btn bg-sage text-white px-7 py-3 hover:bg-sage-deep;
+  }
+  .btn-ghost {
+    @apply btn border border-line bg-surface text-ink px-7 py-3 hover:border-sage;
+  }
+  .btn-dark {
+    @apply btn bg-forest text-on-dark px-7 py-3 hover:bg-ink;
+  }
+  .card {
+    @apply rounded-lg bg-surface border border-line;
+  }
+  .eyebrow {
+    @apply font-body text-xs font-semibold tracking-[0.16em] uppercase text-sage;
+  }
+  .code-chip {
+    @apply font-mono text-[11px] font-semibold rounded px-1.5 py-0.5 bg-[#E7EEE7] text-sage-deep;
+  }
+}

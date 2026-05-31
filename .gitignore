@@ -1,0 +1,29 @@
+# dependencies / builds
+node_modules/
+dist/
+dev-dist/
+**/dev-dist/
+
+# secrets / local env (NEVER commit — real keys live here)
+.env
+.env.*.local
+.dev.vars
+
+# tooling / runtime
+*.log
+.wrangler/
+coverage/
+.DS_Store
+
+# scratch
+_demo_*.mjs
+
+# heavy / private demo media — kept out of the showcase repo (no personal data,
+# lean checkout). The app references these locally; only the brand logo ships.
+/images/
+design.pen
+docs/therapist_profile.png
+docs/map.png
+docs/BldFront.jpg
+frontend/public/images/*
+!frontend/public/images/logo-mark.png

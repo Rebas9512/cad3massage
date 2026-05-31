@@ -1,0 +1,36 @@
+{
+  "name": "cad3massage",
+  "private": true,
+  "version": "0.0.0",
+  "description": "CAD3 Massage — website + booking system (monorepo).",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:wait": "node scripts/wait-for-db.mjs",
+    "migrate": "npm -w @cad3/api run migrate",
+    "seed": "npm -w @cad3/api run seed",
+    "setup": "npm install && npm run db:up && npm run db:wait && npm run migrate && npm run seed",
+    "dev:api": "npm -w @cad3/api run dev",
+    "dev:web": "npm -w @cad3/web run dev",
+    "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "start": "bash dev.sh",
+    "reset": "npm run db:up && npm run db:wait && npm run migrate && npm run seed",
+    "build": "npm -w @cad3/web run build",
+    "accept": "npm -C script test",
+    "stop": "docker compose stop db"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "overrides": {
+    "@neondatabase/serverless": "0.10.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
