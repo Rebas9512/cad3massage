@@ -69,10 +69,23 @@ export async function serviceByCode(code: string): Promise<any | undefined> {
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
-export async function availability(serviceId: string, days = 7): Promise<Res> {
+export async function availability(
+  serviceId: string,
+  days = 7,
+  opts: { noBuffer?: boolean; noLead?: boolean; excludeBookingId?: string } = {},
+): Promise<Res> {
   const from = ymd(new Date());
   const to = ymd(new Date(Date.now() + days * 86_400_000));
-  return GET(`/availability?serviceId=${encodeURIComponent(serviceId)}&from=${from}&to=${to}`);
+  const q = new URLSearchParams({ serviceId, from, to });
+  if (opts.noBuffer) q.set('noBuffer', 'true');
+  if (opts.noLead) q.set('noLead', 'true');
+  if (opts.excludeBookingId) q.set('excludeBookingId', opts.excludeBookingId);
+  return GET(`/availability?${q.toString()}`);
+}
+
+/** True iff availability `body` offers a slot starting at exactly `startMs` (epoch). */
+export function hasSlotAt(body: any, startMs: number): boolean {
+  return flattenSlots(body).some((s) => new Date(s.startAt).getTime() === startMs);
 }
 
 export function flattenSlots(availabilityBody: any): any[] {
@@ -101,6 +114,45 @@ export const sampleCustomer = (over: Record<string, unknown> = {}) => ({
 export const createBooking = (payload: Record<string, unknown>) => POST('/bookings', payload);
 export const lookup = (code: string) => GET(`/bookings/lookup?code=${encodeURIComponent(code)}`);
 export const cancel = (code: string) => POST(`/bookings/${encodeURIComponent(code)}/cancel`, {});
+
+// ---- staff helpers --------------------------------------------------------
+
+export const staffCreate = (token: string, payload: Record<string, unknown>) =>
+  POST('/staff/bookings', payload, bearer(token));
+
+export const patchBooking = (token: string, id: string, patch: Record<string, unknown>) =>
+  http('PATCH', `/staff/bookings/${id}`, patch, bearer(token));
+
+export const staffBookings = (token: string, from?: string, to?: string) =>
+  GET(`/staff/bookings${from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : ''}`, bearer(token));
+
+/** Staff schedule row for a confirmation code (incl. occupiedUntil), or undefined. */
+export async function staffBookingByCode(token: string, code: string): Promise<any | undefined> {
+  const r = await staffBookings(token);
+  return (Array.isArray(r.body) ? r.body : []).find((b: any) => b.confirmationCode === code);
+}
+
+/**
+ * Sorted slots (default-buffer) for the first OPEN day at least `minDaysAhead`
+ * out with ≥3 slots. Tests pick a far-future, empty day (distinct offset each)
+ * so they never contend with the earliest-slot pickers in other spec files —
+ * the studio has a single therapist, so all bookings share one timeline.
+ */
+export async function farDayslots(
+  serviceId: string,
+  minDaysAhead: number,
+): Promise<{ date: string; slots: any[] } | null> {
+  const r = await availability(serviceId, 30);
+  const minDate = new Date(Date.now() + minDaysAhead * 86_400_000).toISOString().slice(0, 10);
+  for (const d of r.body?.days ?? []) {
+    if (d.date < minDate) continue; // YYYY-MM-DD compares chronologically
+    const slots = (d.therapists ?? [])
+      .flatMap((t: any) => t.slots ?? [])
+      .sort((a: any, b: any) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    if (slots.length >= 3) return { date: d.date, slots };
+  }
+  return null;
+}
 
 export async function login(
   email = process.env.STAFF_EMAIL,

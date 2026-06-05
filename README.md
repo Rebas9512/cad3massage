@@ -46,7 +46,7 @@ A complete, **production** booking platform for a single-therapist massage studi
 | | |
 |---|---|
 | 🧖 **Customers** | Browse services → pick an open time on a visual schedule → enter details → done. No account, pay in person. Look up or cancel a booking by confirmation code. Installable as a PWA. |
-| 🗓️ **The therapist** | Tablet-first console: day / week / month schedule, drag-to-create time off, reschedule with live conflict checks, manual phone-in bookings, confirmation-code search — bilingual (EN / 中). |
+| 🗓️ **The therapist** | Tablet-first console: day / week / month schedule, drag-to-create time off, reschedule with live conflict checks, manual phone-in bookings, confirmation-code search — bilingual (EN / 中). Repeat **no-show customers are flagged** on sight, and **back-to-back** / **walk-in** toggles drop the rest-buffer or the 1-hour notice for true consecutive or same-hour appointments — on both new bookings and reschedules. |
 | 🔔 **Automatically** | Confirmation, cancellation, reschedule &amp; staff-alert emails, a secondary WeChat push for the owner, and a Cron-driven 2-hour reminder sweep. |
 
 ---
@@ -68,9 +68,11 @@ EXCLUDE USING gist (
 
 The endpoint simply `INSERT`s and catches SQLSTATE `23P01` → `409 Conflict` — no `SELECT-then-INSERT`, no transactions (the production driver has none). An acceptance test fires concurrent requests at one slot and asserts **exactly one `201` and one `409`**.
 
+Two studio rules ride on the same machinery. The 30-minute rest **buffer is baked into `occupied_until`** (so the exclusion constraint enforces it too), and online bookings need **1 hour's notice**. Staff can override either — a **back-to-back** toggle drops the buffer, a **walk-in** toggle drops the lead time — on both new bookings and reschedules. But the public path *always* enforces both: the override flags **aren't in the public booking schema**, and the server re-validates every incoming booking against the strict defaults — so a guest can never quietly take the therapist's rest gap or slip a booking inside the hour. Every direction is covered by acceptance tests (`BUF-*`, `LEAD-*`).
+
 ### One availability engine — *what we offer* and *what we accept* can never drift
 
-The same pure function computes the customer's open slots **and** validates the incoming booking server-side. Working hours come from the DB (so the staff "Working Hours" editor actually drives availability), minus time off, minus existing bookings' buffered occupancy, snapped to a 15-minute grid. Offer and accept are literally the same code path.
+The same pure function computes the customer's open slots **and** validates the incoming booking server-side. Working hours come from the DB (so the staff "Working Hours" editor actually drives availability), minus time off, minus existing bookings' buffered occupancy, snapped to a 15-minute grid and no sooner than the 1-hour lead time. Offer and accept are literally the same code path — and because it's a pure function of `now` + state, the tricky boundaries (flush back-to-back, the 1-hour lead window) are pinned down by deterministic acceptance cases.
 
 ### Same code, two runtimes — the DB driver swaps itself
 
@@ -106,7 +108,7 @@ The staff subdomain boots straight into the console; the main domain serves the 
 ### Notifications: pluggable &amp; non-blocking · Tested as a black box
 
 - Email (Resend) and WeChat (PushPlus) sit behind small provider interfaces (console vs. real, gated by env flags). Sends are fire-and-forget via `ctx.waitUntil()` on Workers, so a slow mail API can never delay or fail a booking. A **Cron Trigger** runs an idempotent reminder sweep.
-- A Vitest harness hits the running API over HTTP with **stable case IDs** (`BOOK-05`, `AVAIL-06`, …) mirroring a written acceptance plan — covering the menu, availability invariants, the double-booking race, lookup/cancel, auth guards, and that availability never leaks other customers' data.
+- A Vitest harness hits the running API over HTTP with **stable case IDs** (`BOOK-05`, `AVAIL-06`, `BUF-12`, `LEAD-02`, …) mirroring a written acceptance plan — covering the menu, availability invariants, the double-booking race, the buffer / back-to-back / lead-time policy, lookup/cancel, auth guards, and that availability never leaks other customers' data.
 
 <details>
 <summary><b>Platform gotchas I hit and handled</b> (debugging stories)</summary>

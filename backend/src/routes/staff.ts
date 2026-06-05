@@ -40,6 +40,26 @@ staff.get('/bookings', async (c) => {
     .innerJoin(staffMember, eq(staffMember.id, booking.therapistId))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(asc(booking.startAt));
+
+  // Repeat-no-show flag (staff-only): a customer — matched by email or last-10
+  // phone digits — who has ANY no_show booking on record gets flagged on every
+  // other booking, so staff see the risk before the appointment. Computed at
+  // read time against the full history, so it's always current even when a
+  // no-show is recorded after the next booking was made.
+  const last10 = (s: string) => { const d = (s.match(/\d/g) ?? []).join(''); return d.length >= 10 ? d.slice(-10) : ''; };
+  const noShows = await db
+    .select({ id: booking.id, phone: booking.customerPhone, email: booking.customerEmail })
+    .from(booking)
+    .where(eq(booking.status, 'no_show'));
+  const priorNoShows = (b: { id: string; customerEmail: string; customerPhone: string }) => {
+    const email = b.customerEmail.trim().toLowerCase();
+    const phone = last10(b.customerPhone);
+    return noShows.filter((ns) =>
+      ns.id !== b.id &&
+      ((email && ns.email.trim().toLowerCase() === email) || (phone && last10(ns.phone) === phone)),
+    ).length;
+  };
+
   return c.json(
     rows.map(({ b, s, t }) => ({
       id: b.id,
@@ -55,6 +75,7 @@ staff.get('/bookings', async (c) => {
       customerEmail: b.customerEmail,
       customerNote: b.customerNote,
       source: b.source,
+      priorNoShowCount: priorNoShows(b),
     })),
   );
 });
@@ -74,7 +95,8 @@ staff.post('/bookings', async (c) => {
 
   const start = new Date(d.startAt);
   const end = new Date(start.getTime() + svc.durationMinutes * 60_000);
-  const occupiedUntil = new Date(end.getTime() + svc.bufferMinutes * 60_000);
+  // Back-to-back: no trailing buffer, so the next booking can sit flush at `end`.
+  const occupiedUntil = d.noBuffer ? end : new Date(end.getTime() + svc.bufferMinutes * 60_000);
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -125,7 +147,7 @@ staff.patch('/bookings/:id', async (c) => {
   let svc = (await db.select().from(service).where(eq(service.id, existing.serviceId)))[0];
   const prevStart = new Date(existing.startAt);
   const prevServiceName = svc?.name ?? '';
-  if (body.startAt || body.serviceId) {
+  if (body.startAt || body.serviceId || body.noBuffer !== undefined) {
     if (body.serviceId && body.serviceId !== existing.serviceId) {
       svc = (await db.select().from(service).where(eq(service.id, body.serviceId)))[0];
       if (!svc) return c.json(apiError('BAD_REQUEST', 'Unknown service'), 400);
@@ -135,7 +157,8 @@ staff.patch('/bookings/:id', async (c) => {
     const end = new Date(start.getTime() + svc!.durationMinutes * 60_000);
     patch.startAt = start;
     patch.endAt = end;
-    patch.occupiedUntil = new Date(end.getTime() + svc!.bufferMinutes * 60_000);
+    // Back-to-back: no trailing buffer (occupied_until = end_at), like staff manual entry.
+    patch.occupiedUntil = body.noBuffer ? end : new Date(end.getTime() + svc!.bufferMinutes * 60_000);
   }
 
   // What actually changed → which customer email (if any) to send afterward.

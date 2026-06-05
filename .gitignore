@@ -18,6 +18,10 @@ coverage/
 # scratch
 _demo_*.mjs
 
+# customer PII — old-customer lists, broadcast script output/logs. NEVER commit
+# (real names / phones / emails). Kept local only.
+/customerinfo/
+
 # heavy / private demo media — kept out of the showcase repo (no personal data,
 # lean checkout). The app references these locally; only the brand logo ships.
 /images/

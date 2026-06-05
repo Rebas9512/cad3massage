@@ -7,11 +7,20 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // We register the SW ourselves in main.tsx so we can poll for updates on a
+      // long-lived standalone PWA (staff iPad) — disable the auto-injected script
+      // to avoid a double registration.
+      injectRegister: false,
       includeAssets: ['images/logo-mark.png'],
       // App shell is precached; API requests are NOT cached (must stay live).
       workbox: {
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [],
+        // A new deploy takes over immediately (no "close every tab" wait) and old
+        // precaches are purged, so a device always ends up on the latest bundle.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
       manifest: {
         name: 'CAD3 Massage',

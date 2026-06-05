@@ -550,6 +550,9 @@ function DateTime({ service, selected, conflict, onSelect, onContinue }: {
                   </select>
                   <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted">▾</span>
                 </div>
+                <p className="mt-2.5 text-xs leading-relaxed text-muted">
+                  Online bookings need at least 1 hour's notice, and times are spaced 30 minutes apart — a short buffer for any delay and to let your therapist rest between sessions. Need a same-hour or back-to-back booking? Call us at <a href={`tel:${STORE.phoneTel}`} className="font-semibold text-sage-deep">{STORE.phone}</a>.
+                </p>
               </div>
             )}
           </>

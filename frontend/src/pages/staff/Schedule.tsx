@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ChevronLeft, ChevronRight, Plus, CalendarX, X, Check, UserX, CalendarClock, CircleX, Phone, Mail, Coffee,
+  ChevronLeft, ChevronRight, Plus, CalendarX, X, Check, UserX, CalendarClock, CircleX, Phone, Mail, Coffee, AlertTriangle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { STUDIO_TZ, WORKING_HOURS, type ServiceDTO, type SlotDTO } from '@cad3/shared';
@@ -125,7 +125,9 @@ export function Schedule() {
           </div>
         )}
         {!isLoading && !isError && view === 'day' && (
-          <DayGantt date={date} bookings={day} offs={offs} selId={selId} onSelect={setSelId} />
+          // Cancelled bookings are dropped from the Gantt entirely (DB record kept
+          // for customer lookup / audit) — `active` excludes them, matching week/month.
+          <DayGantt date={date} bookings={active} offs={offs} selId={selId} onSelect={setSelId} />
         )}
         {!isLoading && !isError && view === 'week' && (
           <WeekView all={all} date={date} onPick={(d) => { setDate(d); setView('day'); }} />
@@ -237,14 +239,14 @@ function DayGantt({ date, bookings, offs, selId, onSelect }: {
             const s = stat(b.status);
             const start = ctMin(b.startAt);
             const sel = selId === b.id;
-            const cancelled = b.status === 'cancelled';
+            const flagged = (b.priorNoShowCount ?? 0) > 0;
             const lay = cols.get(b.id) ?? { col: 0, cols: 1 };
             return (
               <button
                 key={b.id}
                 onClick={() => onSelect(b.id)}
                 className="absolute flex gap-2 overflow-hidden rounded-md text-left"
-                style={{ top: `${pct(start)}%`, height: `${hPct(ctMin(b.endAt) - start)}%`, left: `calc(${(lay.col / lay.cols) * 100}% + 4px)`, width: `calc(${(1 / lay.cols) * 100}% - ${lay.cols > 1 ? 6 : 8}px)`, backgroundColor: s.bg, boxShadow: sel ? 'inset 0 0 0 2px #6B8F71' : 'inset 0 0 0 1px rgba(0,0,0,0.04)', opacity: cancelled ? 0.6 : 1, zIndex: sel ? 6 : 1 }}
+                style={{ top: `${pct(start)}%`, height: `${hPct(ctMin(b.endAt) - start)}%`, left: `calc(${(lay.col / lay.cols) * 100}% + 4px)`, width: `calc(${(1 / lay.cols) * 100}% - ${lay.cols > 1 ? 6 : 8}px)`, backgroundColor: s.bg, boxShadow: sel ? 'inset 0 0 0 2px #6B8F71' : 'inset 0 0 0 1px rgba(0,0,0,0.04)', zIndex: sel ? 6 : 1 }}
               >
                 <span className="w-1 shrink-0" style={{ backgroundColor: s.bar }} />
                 <span className="flex min-w-0 flex-1 flex-col justify-center py-1 pr-2 leading-tight">
@@ -252,7 +254,10 @@ function DayGantt({ date, bookings, offs, selId, onSelect }: {
                     <span className="rounded-sm bg-white/70 px-1.5 py-px text-[10px] font-bold text-ink">{b.service.code}</span>
                     <span className={`truncate text-[12px] font-semibold ${s.time}`}>{fmtTime(b.startAt)}–{fmtTime(b.endAt)}</span>
                   </span>
-                  <span className={`truncate font-heading text-[15px] font-semibold text-ink ${cancelled ? 'line-through' : ''}`}>{b.customerName}</span>
+                  <span className="flex items-center gap-1">
+                    {flagged && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#9C6B38]" aria-label={t('sch.noshowflag')} />}
+                    <span className="truncate font-heading text-[15px] font-semibold text-ink">{b.customerName}</span>
+                  </span>
                 </span>
               </button>
             );
@@ -398,6 +403,11 @@ function Detail({ b, onClose, onStatus, onReschedule }: {
         {b.customerPhone && <span className="flex items-center gap-2 text-ink"><Phone className="h-4 w-4 text-sage-deep" /> {b.customerPhone}</span>}
         {b.customerEmail && <span className="flex items-center gap-2 text-ink"><Mail className="h-4 w-4 text-sage-deep" /> {b.customerEmail}</span>}
       </div>
+      {(b.priorNoShowCount ?? 0) > 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-md bg-[#F6EEE3] px-3 py-2 text-sm font-semibold text-[#9C6B38]">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {t('d.noshowflag', { n: b.priorNoShowCount! })}
+        </div>
+      )}
       <div className="mt-4 space-y-1.5 border-t border-line pt-4 text-sm">
         <div className="flex justify-between gap-4">
           <span className="shrink-0 text-muted">{t('d.code')}</span>
@@ -443,10 +453,10 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 /* ---------- slot picker (shared by new + reschedule) ---------- */
-function SlotPicker({ serviceId, value, onChange, excludeBookingId }: { serviceId: string; value: SlotDTO | null; onChange: (s: SlotDTO) => void; excludeBookingId?: string }) {
+function SlotPicker({ serviceId, value, onChange, excludeBookingId, noBuffer, noLead }: { serviceId: string; value: SlotDTO | null; onChange: (s: SlotDTO) => void; excludeBookingId?: string; noBuffer?: boolean; noLead?: boolean }) {
   const t = useT();
   const lang = useLang();
-  const { data, isLoading } = useQuery({ queryKey: ['availability', serviceId, excludeBookingId ?? null], queryFn: () => api.availability(serviceId, undefined, excludeBookingId), enabled: !!serviceId });
+  const { data, isLoading } = useQuery({ queryKey: ['availability', serviceId, excludeBookingId ?? null, !!noBuffer, !!noLead], queryFn: () => api.availability(serviceId, undefined, excludeBookingId, noBuffer, noLead), enabled: !!serviceId });
   const days = useMemo(() => (data?.days ?? []).map((d) => ({ date: d.date, slots: d.therapists.flatMap((th) => th.slots) })).filter((d) => d.slots.length), [data]);
   const [activeDate, setActiveDate] = useState<string | null>(null);
   const cur = days.find((d) => d.date === activeDate) ?? days[0];
@@ -484,12 +494,16 @@ function Reschedule({ token, b, onClose, onDone }: { token: string; b: StaffBook
   const { data: services = [] } = useQuery({ queryKey: ['services'], queryFn: api.services });
   const [serviceId, setServiceId] = useState(b.service.id);
   const [slot, setSlot] = useState<SlotDTO | null>(null);
+  // Preserve the booking's existing buffer policy: a back-to-back booking (occupied
+  // up to end_at, no buffer) stays back-to-back unless staff changes it.
+  const [noBuffer, setNoBuffer] = useState(!!b.occupiedUntil && b.occupiedUntil === b.endAt);
+  const [noLead, setNoLead] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     if (!slot) return;
     setBusy(true); setErr(null);
-    const r = await api.patchBooking(token, b.id, { startAt: slot.startAt, serviceId });
+    const r = await api.patchBooking(token, b.id, { startAt: slot.startAt, serviceId, noBuffer });
     setBusy(false);
     if (r.status === 200) onDone(ctDate(slot.startAt));
     else if (r.status === 409) setErr(t('err.conflict'));
@@ -504,7 +518,21 @@ function Reschedule({ token, b, onClose, onDone }: { token: string; b: StaffBook
             {(services as ServiceDTO[]).map((s) => <option key={s.id} value={s.id}>{s.code} · {s.name || s.category} · {s.durationMinutes}m · {usd(s.priceCents)}</option>)}
           </select>
         </Field>
-        <Field label={t('nb.datetime')}><SlotPicker serviceId={serviceId} value={slot} onChange={setSlot} excludeBookingId={b.id} /></Field>
+        <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line bg-bg-alt/50 p-3">
+          <input type="checkbox" checked={noBuffer} onChange={() => { setNoBuffer((v) => !v); setSlot(null); }} className="mt-0.5 h-4 w-4 shrink-0 accent-[#6B8F71]" />
+          <span className="text-sm">
+            <span className="font-semibold text-ink">{t('nb.b2b')}</span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-muted">{t('nb.b2bhint')}</span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line bg-bg-alt/50 p-3">
+          <input type="checkbox" checked={noLead} onChange={() => { setNoLead((v) => !v); setSlot(null); }} className="mt-0.5 h-4 w-4 shrink-0 accent-[#6B8F71]" />
+          <span className="text-sm">
+            <span className="font-semibold text-ink">{t('nb.walkin')}</span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-muted">{t('nb.walkinhint')}</span>
+          </span>
+        </label>
+        <Field label={t('nb.datetime')}><SlotPicker serviceId={serviceId} value={slot} onChange={setSlot} excludeBookingId={b.id} noBuffer={noBuffer} noLead={noLead} /></Field>
       </div>
       {err && <p className="mt-3 text-sm font-medium text-[#A23A2E]">{err}</p>}
       <button onClick={submit} disabled={!slot || busy} className="btn-primary mt-5 w-full disabled:opacity-50">{busy ? t('rs.saving') : t('rs.move')}</button>
@@ -522,6 +550,8 @@ function NewBooking({ token, onClose, onCreated }: { token: string; onClose: () 
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
+  const [noBuffer, setNoBuffer] = useState(false);
+  const [noLead, setNoLead] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const svc = services.find((s) => s.id === serviceId);
@@ -532,6 +562,7 @@ function NewBooking({ token, onClose, onCreated }: { token: string; onClose: () 
     const r = await api.staffCreateBooking(token, {
       serviceId, startAt: slot.startAt, customerName: name.trim(),
       customerPhone: phone.trim() || undefined, customerEmail: email.trim() || undefined, customerNote: note.trim() || undefined,
+      noBuffer: noBuffer || undefined,
     });
     setBusy(false);
     if (r.status === 201) onCreated(ctDate(slot.startAt));
@@ -548,7 +579,25 @@ function NewBooking({ token, onClose, onCreated }: { token: string; onClose: () 
             {(services as ServiceDTO[]).map((s) => <option key={s.id} value={s.id}>{s.code} · {s.name || s.category} · {s.durationMinutes}m · {usd(s.priceCents)}</option>)}
           </select>
         </Field>
-        {svc && <Field label={t('nb.datetime')}><SlotPicker serviceId={serviceId} value={slot} onChange={setSlot} /></Field>}
+        {svc && (
+          <>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line bg-bg-alt/50 p-3">
+              <input type="checkbox" checked={noBuffer} onChange={() => { setNoBuffer((v) => !v); setSlot(null); }} className="mt-0.5 h-4 w-4 shrink-0 accent-[#6B8F71]" />
+              <span className="text-sm">
+                <span className="font-semibold text-ink">{t('nb.b2b')}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted">{t('nb.b2bhint')}</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line bg-bg-alt/50 p-3">
+              <input type="checkbox" checked={noLead} onChange={() => { setNoLead((v) => !v); setSlot(null); }} className="mt-0.5 h-4 w-4 shrink-0 accent-[#6B8F71]" />
+              <span className="text-sm">
+                <span className="font-semibold text-ink">{t('nb.walkin')}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted">{t('nb.walkinhint')}</span>
+              </span>
+            </label>
+            <Field label={t('nb.datetime')}><SlotPicker serviceId={serviceId} value={slot} onChange={setSlot} noBuffer={noBuffer} noLead={noLead} /></Field>
+          </>
+        )}
         <Field label={t('nb.name')}><input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-sm border border-line bg-bg px-4 py-3 text-sm outline-none focus:border-sage" /></Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('nb.phone')}><input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-sm border border-line bg-bg px-4 py-3 text-sm outline-none focus:border-sage" /></Field>

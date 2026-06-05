@@ -2,8 +2,25 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import './index.css';
+
+// Keep installed devices on the latest build. With registerType:'autoUpdate' a new
+// SW skips waiting, claims clients, and reloads the page automatically. But the
+// browser only looks for a new SW on navigation — a standalone PWA left open (e.g.
+// the staff iPad) may not navigate for days. So we also poll hourly and re-check
+// whenever the app regains focus, so a fresh deploy is picked up promptly.
+registerSW({
+  onRegisteredSW(_swUrl, r) {
+    if (!r) return;
+    const check = () => { if (navigator.onLine) r.update().catch(() => {}); };
+    setInterval(check, 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') check();
+    });
+  },
+});
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } },

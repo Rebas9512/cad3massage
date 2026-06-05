@@ -12,6 +12,8 @@ availabilityRoute.get('/', async (c) => {
   const parsed = availabilityQuerySchema.safeParse(c.req.query());
   if (!parsed.success) return c.json(apiError('BAD_REQUEST', 'Invalid query', parsed.error.flatten()), 400);
   const { serviceId, therapistId, excludeBookingId } = parsed.data;
+  const noBuffer = parsed.data.noBuffer === 'true';
+  const noLead = parsed.data.noLead === 'true';
 
   const svc = (await db.select().from(service).where(eq(service.id, serviceId)))[0];
   if (!svc || !svc.isActive) return c.json(apiError('NOT_FOUND', 'Service not found'), 404);
@@ -31,9 +33,10 @@ availabilityRoute.get('/', async (c) => {
     const days = await availabilityForTherapist({
       therapistId: t.id,
       durationMinutes: svc.durationMinutes,
-      bufferMinutes: svc.bufferMinutes,
+      bufferMinutes: noBuffer ? 0 : svc.bufferMinutes,
       now,
       excludeBookingId,
+      minAdvanceMinutes: noLead ? 0 : undefined,
     });
     perTherapist.push({ therapistId: t.id, days });
   }

@@ -61,11 +61,11 @@ const unwrap = async <T>(p: Promise<ApiResult<T>>): Promise<T> => {
 export const api = {
   services: () => unwrap(request<ServiceDTO[]>('GET', '/services')),
   therapists: () => unwrap(request<TherapistDTO[]>('GET', '/therapists')),
-  availability: (serviceId: string, therapistId?: string, excludeBookingId?: string) =>
+  availability: (serviceId: string, therapistId?: string, excludeBookingId?: string, noBuffer?: boolean, noLead?: boolean) =>
     unwrap(
       request<AvailabilityResponse>(
         'GET',
-        `/availability?serviceId=${serviceId}${therapistId ? `&therapistId=${therapistId}` : ''}${excludeBookingId ? `&excludeBookingId=${excludeBookingId}` : ''}`,
+        `/availability?serviceId=${serviceId}${therapistId ? `&therapistId=${therapistId}` : ''}${excludeBookingId ? `&excludeBookingId=${excludeBookingId}` : ''}${noBuffer ? '&noBuffer=true' : ''}${noLead ? '&noLead=true' : ''}`,
       ),
     ),
   createBooking: (payload: Record<string, unknown>) => request<BookingDTO>('POST', '/bookings', payload),
@@ -99,6 +99,8 @@ export interface StaffBooking {
   status: string;
   startAt: string;
   endAt: string;
+  /** end_at + buffer; equals endAt when the booking was made back-to-back (no buffer). */
+  occupiedUntil?: string;
   service: { id: string; code: string; name: string; durationMinutes: number; priceCents: number };
   therapist: { id: string; name: string };
   customerName: string;
@@ -106,6 +108,8 @@ export interface StaffBooking {
   customerEmail: string;
   customerNote: string | null;
   source: string;
+  /** Staff-only: how many prior no_show bookings this customer has on record (by phone/email). */
+  priorNoShowCount?: number;
 }
 export interface WorkingHourRow {
   id?: string;

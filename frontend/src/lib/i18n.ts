@@ -77,6 +77,8 @@ const DICT: Record<string, [string, string]> = {
   'd.total': ['Total', '合计'],
   'd.payinperson': ['pay in person', '到店支付'],
   'd.notes': ['Notes', '备注'],
+  'd.noshowflag': ['Previously no-showed {n}×', '曾爽约 {n} 次'],
+  'sch.noshowflag': ['Previously no-showed', '曾爽约'],
   'd.complete': ['Mark completed', '标记完成'],
   'd.reschedule': ['Reschedule', '改期'],
   'd.noshow': ['No-show', '未到'],
@@ -105,6 +107,10 @@ const DICT: Record<string, [string, string]> = {
   'nb.creating': ['Creating…', '创建中…'],
   'nb.required': ['Pick a service, a time, and enter a name.', '请选择服务、时间并填写姓名。'],
   'nb.selectservice': ['Select a service…', '选择服务…'],
+  'nb.b2b': ['Back-to-back (no 30-min buffer)', '连续预约（取消 30 分钟缓冲）'],
+  'nb.b2bhint': ['Drops the post-session gap so this booking can sit flush against another. Use for true back-to-back appointments.', '取消预约后的间隔，让这单可以与另一单无缝相接。用于真正的连续预约。'],
+  'nb.walkin': ['Walk-in / last-minute (skip 1-hour notice)', '临时预约（忽略提前 1 小时）'],
+  'nb.walkinhint': ['Offers times within the next hour for genuine walk-ins or phone bookings. The public site still requires 1 hour’s notice.', '显示未来 1 小时内的时段，用于真正的临时到店或电话预约。公开网站仍需提前 1 小时。'],
 
   // slot picker
   'sp.selecttime': ['Select a time…', '选择时间…'],

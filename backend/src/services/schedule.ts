@@ -23,11 +23,13 @@ export interface TherapistAvailabilityOpts {
   now: Date;
   /** Reschedule: ignore this booking's own occupancy so it can shift to a nearby time. */
   excludeBookingId?: string;
+  /** Staff walk-in override: minutes of required lead time (0 = offer near-term slots). Default = RULES.minAdvanceMinutes. */
+  minAdvanceMinutes?: number;
 }
 
 /** Offered slots for one therapist+service, honoring DB working hours, bookings, and time off. */
 export async function availabilityForTherapist(opts: TherapistAvailabilityOpts): Promise<DaySlots[]> {
-  const { therapistId, durationMinutes, bufferMinutes, now, excludeBookingId } = opts;
+  const { therapistId, durationMinutes, bufferMinutes, now, excludeBookingId, minAdvanceMinutes } = opts;
   const bookings = await db
     .select({ start: booking.startAt, end: booking.occupiedUntil })
     .from(booking)
@@ -49,6 +51,7 @@ export async function availabilityForTherapist(opts: TherapistAvailabilityOpts):
     occupied: bookings.map((b) => ({ start: new Date(b.start).getTime(), end: new Date(b.end).getTime() })),
     timeOff: offs.map((o) => ({ start: new Date(o.start).getTime(), end: new Date(o.end).getTime() })),
     workingHours: wh,
+    minAdvanceMinutes,
   });
 }
 
