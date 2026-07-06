@@ -114,8 +114,10 @@ const DICT: Record<string, [string, string]> = {
 
   // slot picker
   'sp.selecttime': ['Select a time…', '选择时间…'],
+  'sp.pickdate': ['Select a date first…', '请先选择日期…'],
   'sp.loading': ['Loading times…', '加载可约时间…'],
   'sp.none': ['No open times in the next 30 days.', '未来 30 天没有可约时间。'],
+  'sp.noneday': ['No open times on this date — pick another date, or adjust the options above.', '该日期没有可选时段——请换个日期，或调整上面的选项。'],
 
   // reschedule
   'rs.title': ['Reschedule', '改期'],

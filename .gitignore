@@ -14,6 +14,7 @@ dev-dist/
 .wrangler/
 coverage/
 .DS_Store
+.claude/
 
 # scratch
 _demo_*.mjs

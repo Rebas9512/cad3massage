@@ -453,36 +453,52 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 /* ---------- slot picker (shared by new + reschedule) ---------- */
-function SlotPicker({ serviceId, value, onChange, excludeBookingId, noBuffer, noLead }: { serviceId: string; value: SlotDTO | null; onChange: (s: SlotDTO) => void; excludeBookingId?: string; noBuffer?: boolean; noLead?: boolean }) {
+function SlotPicker({ serviceId, value, onChange, excludeBookingId, noBuffer, noLead }: { serviceId: string; value: SlotDTO | null; onChange: (s: SlotDTO | null) => void; excludeBookingId?: string; noBuffer?: boolean; noLead?: boolean }) {
   const t = useT();
   const lang = useLang();
   const { data, isLoading } = useQuery({ queryKey: ['availability', serviceId, excludeBookingId ?? null, !!noBuffer, !!noLead], queryFn: () => api.availability(serviceId, undefined, excludeBookingId, noBuffer, noLead), enabled: !!serviceId });
-  const days = useMemo(() => (data?.days ?? []).map((d) => ({ date: d.date, slots: d.therapists.flatMap((th) => th.slots) })).filter((d) => d.slots.length), [data]);
+  const days = useMemo(() => (data?.days ?? []).map((d) => ({ date: d.date, slots: d.therapists.flatMap((th) => th.slots) })), [data]);
   const [activeDate, setActiveDate] = useState<string | null>(null);
-  const cur = days.find((d) => d.date === activeDate) ?? days[0];
+  // Guard against silent day-jumps: days with no slots stay visible but disabled,
+  // and we never auto-select a different day than today. If today has no slots,
+  // staff must explicitly tap a date before any times are offered.
+  const today = ctDate(new Date());
+  const cur = activeDate ? days.find((d) => d.date === activeDate) : days.find((d) => d.date === today && d.slots.length > 0);
 
   if (isLoading) return <p className="text-sm text-muted">{t('sp.loading')}</p>;
-  if (!days.length) return <p className="text-sm text-muted">{t('sp.none')}</p>;
+  if (!days.some((d) => d.slots.length)) return <p className="text-sm text-muted">{t('sp.none')}</p>;
   return (
     <div className="space-y-3">
       <div className="flex gap-2 overflow-x-auto pb-1">
         {days.map((d) => {
           const on = (cur?.date ?? '') === d.date;
+          const label = lang === 'zh' ? `${Number(d.date.slice(5, 7))}月${Number(d.date.slice(8, 10))}日` : `${d.date.slice(5, 7)}/${d.date.slice(8, 10)}`;
           return (
-            <button key={d.date} type="button" onClick={() => setActiveDate(d.date)} className={`shrink-0 whitespace-nowrap rounded-md border px-3.5 py-2 text-sm font-medium ${on ? 'border-sage bg-sage text-white' : 'border-line bg-surface text-text'}`}>
-              {lang === 'zh' ? `${Number(d.date.slice(5, 7))}月${Number(d.date.slice(8, 10))}日` : `${d.date.slice(5, 7)}/${d.date.slice(8, 10)}`}
+            <button
+              key={d.date}
+              type="button"
+              disabled={!d.slots.length}
+              onClick={() => { if (d.date !== (cur?.date ?? '')) onChange(null); setActiveDate(d.date); }}
+              className={`shrink-0 whitespace-nowrap rounded-md border px-3.5 py-2 text-sm font-medium ${on ? 'border-sage bg-sage text-white' : d.slots.length ? 'border-line bg-surface text-text' : 'cursor-not-allowed border-line bg-bg-alt/50 text-muted opacity-60'}`}
+            >
+              {d.date === today ? `${t('sch.today')} · ${label}` : label}
             </button>
           );
         })}
       </div>
-      <select
-        value={value?.startAt ?? ''}
-        onChange={(e) => { const sl = cur?.slots.find((x) => x.startAt === e.target.value); if (sl) onChange(sl); }}
-        className="w-full rounded-sm border border-line bg-bg px-4 py-3 text-sm outline-none focus:border-sage"
-      >
-        <option value="" disabled>{t('sp.selecttime')}</option>
-        {cur?.slots.map((sl) => <option key={sl.startAt} value={sl.startAt}>{fmtTime(sl.startAt)}</option>)}
-      </select>
+      {cur && !cur.slots.length ? (
+        <p className="text-sm text-muted">{t('sp.noneday')}</p>
+      ) : (
+        <select
+          value={value?.startAt ?? ''}
+          disabled={!cur}
+          onChange={(e) => { const sl = cur?.slots.find((x) => x.startAt === e.target.value); if (sl) onChange(sl); }}
+          className="w-full rounded-sm border border-line bg-bg px-4 py-3 text-sm outline-none focus:border-sage disabled:opacity-60"
+        >
+          <option value="" disabled>{cur ? t('sp.selecttime') : t('sp.pickdate')}</option>
+          {cur?.slots.map((sl) => <option key={sl.startAt} value={sl.startAt}>{fmtTime(sl.startAt)}</option>)}
+        </select>
+      )}
     </div>
   );
 }
